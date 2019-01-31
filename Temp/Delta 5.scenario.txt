@@ -1,1 +1,0 @@
-{"parkProperties":{"name":"Delta 5","guid":"333333333"}}
