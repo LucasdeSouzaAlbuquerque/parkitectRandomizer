@@ -5,166 +5,220 @@ import random
 import json
 
 def getListOfFiles(dirName):
-    listOfFile = os.listdir(dirName)
-    allFiles = list()
-    for entry in listOfFile:
-        fullPath = os.path.join(dirName, entry)
-        if os.path.isdir(fullPath):
-            allFiles = allFiles + getListOfFiles(fullPath)
-        else:
-            allFiles.append({"entry": entry, "fullPath": fullPath})        
-    return allFiles
+	listOfFile = os.listdir(dirName)
+	allFiles = list()
+	for entry in listOfFile:
+		fullPath = os.path.join(dirName, entry)
+		if os.path.isdir(fullPath):
+			allFiles = allFiles + getListOfFiles(fullPath)
+		else:
+			allFiles.append({"entry": entry, "fullPath": fullPath})        
+	return allFiles
 
 def getLevel(levelPool, usedLevels):
-    repeat = True
-    while repeat:
-        repeat = False
-        newLevel = levelPool[random.randint(0, len(levelPool)-1)]
-        if(newLevel["entry"] in usedLevels):
-            repeat = True
-        else:
-            return newLevel
+	repeat = True
+	while repeat:
+		repeat = False
+		newLevel = levelPool[random.randint(0, len(levelPool)-1)]
+		if(newLevel["entry"] in usedLevels):
+			repeat = True
+		else:
+			return newLevel
 
 def ungzip(elem):
-    with gzip.open(elem["fullPath"], 'rb') as f_in:
-        with open("Temp/"+elem["entry"]+".txt", 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
+	with gzip.open(elem["fullPath"], 'rb') as f_in:
+		with open("Temp/"+elem["entry"]+".txt", 'wb') as f_out:
+			shutil.copyfileobj(f_in, f_out)
 
 def switchGuids(oldLevel, newLevel):
-    with open("Temp/"+oldLevel["entry"]+".txt") as old_file:
-        old_data = old_file.read()
-        guid_index = old_data.find("guid")
-        old_guid_forward = old_data[guid_index+7:len(old_data)]
-        end_guid_index = old_guid_forward.find('",')
-        guid = old_guid_forward[:end_guid_index]      
-        with open("Temp/"+newLevel["entry"]+".txt") as new_file:
-            new_data = new_file.read()
-            guid_index = new_data.find("guid")
-            new_guid_forward = new_data[guid_index+7:len(new_data)]
-            end_guid_index = new_guid_forward.find('",')
-            new_data_modified = new_data[:guid_index+7] + guid + new_data[guid_index+7+end_guid_index:]
-            return new_data_modified
+	with open("Temp/"+oldLevel["entry"]+".txt") as old_file:
+		old_data = old_file.read()
+		guid_index = old_data.find("guid")
+		old_guid_forward = old_data[guid_index+7:len(old_data)]
+		end_guid_index = old_guid_forward.find('",')
+		guid = old_guid_forward[:end_guid_index]      
+		with open("Temp/"+newLevel["entry"]+".txt") as new_file:
+			newData = new_file.read()
+			guid_index = newData.find("guid")
+			new_guid_forward = newData[guid_index+7:len(newData)]
+			end_guid_index = new_guid_forward.find('",')
+			newData_modified = newData[:guid_index+7] + guid + newData[guid_index+7+end_guid_index:]
+			return newData_modified
 
 def writeToFile(newLevel, data):
-    f_out = gzip.open('New Campaign/Campaign/'+newLevel["entry"], 'wb')
-    byteData = bytes(data, 'utf-8')
-    f_out.write(byteData)
-    f_out.close()
+	f_out = gzip.open('New Campaign/Campaign/'+newLevel["entry"], 'wb')
+	byteData = bytes(data, 'utf-8')
+	f_out.write(byteData)
+	f_out.close()
 
 def printLevel(officialLevel, newLevel):
-    print(officialLevel["entry"] + " -> " + newLevel["entry"])
-    
-def main():
-    baseDirName = os.path.dirname(os.path.abspath(__file__))
-    oldDirName = baseDirName + "\\Official Campaign\\Campaign"
-    newDirName = baseDirName + "\\Level Pool"
-    officialCampaign = getListOfFiles(oldDirName)
-    levelPool = getListOfFiles(newDirName)
-    usedLevels = {}
-            
-    for officialLevel in officialCampaign:
-        newLevel = getLevel(levelPool, usedLevels)
-        printLevel(officialLevel, newLevel)
-        usedLevels[newLevel["entry"]] = True
-        ungzip(officialLevel)
-        ungzip(newLevel)
-        newData = switchGuids(officialLevel, newLevel)
-        newData = replaceResearch(newData)
-        writeToFile(newLevel, newData)
+	print(officialLevel["entry"] + " -> " + newLevel["entry"])
 
-def replaceResearch(new_data):
-    newResearch = randomizeResearch()
-    rules_index = new_data.find("rules")
-    rules_forward = new_data[rules_index+8:len(new_data)]
-    end_rules_index = rules_forward.find('],')
-    new_data_modified = new_data[:rules_index+8] + newResearch + new_data[rules_index+8+end_rules_index:]
-    return new_data_modified
+def randRangeStep(start, stop, step):
+	if(step == 0):
+		return random.uniform(start, stop)
+	else:
+		return random.randint(0, int((stop-start)/step)) * step + start
+
+def replaceSimpleRandom(field, newData, start, stop, step=0, separator=","):
+	offset = getOffset(field)
+	newValue = randRangeStep(start, stop, step)
+	index = newData.find(field)
+	forward = newData[index+offset:len(newData)]
+	end_index = forward.find(separator)
+	newData_modified = newData[:index+offset] + newValue + newData[index+offset+end_index:]
+	return newData_modified
+
+def getOffset(field):
+	return 3+len(field)
+
+def replaceWithValue(field, newData, newValue, separator=","):
+	offset = getOffset(field)
+	index = newData.find(field)
+	forward = newData[index+offset:len(newData)]
+	end_index = forward.find(separator)
+	newData_modified = newData[:index+offset] + newValue + newData[index+offset+end_index:]
+	return newData_modified
+
+def replaceWithBoolean(field, newData, percentageThreshold=50, separator=","):
+	value = random.randint(1,100)
+	newBool = "false"
+	if(value > percentageThreshold):
+		newBool = "true"
+	return replaceWithValue(field, newData, newBool, separator)
+
+def whatToCharge(newData, percentageThreshold=50, separator=","):
+	value = random.randint(1,100)
+	if(value > percentageThreshold):
+		newData = replaceWithValue("cantChargeParkEntranceFee", newData, "true", separator)
+		newData = replaceWithValue("freeRideEntranceFees", newData, "false", separator)
+	elif(value <= 100 - percentageThreshold):
+		newData = replaceWithValue("cantChargeParkEntranceFee", newData, "false", separator)
+		newData = replaceWithValue("freeRideEntranceFees", newData, "true", separator)
+	else:
+		newData = replaceWithValue("cantChargeParkEntranceFee", newData, "false", separator)
+		newData = replaceWithValue("freeRideEntranceFees", newData, "false", separator)
+	return newData
+
+def replaceResearch(newData):
+	return replaceWithValue("rules", randomizeResearch(), newData, "],")
 
 def randomizeResearch():
-    result = ""
-    with open("Data/researchableObjects.txt", 'r') as f_in:
-        researchableObjects = f_in.readlines()
-        length = len(researchableObjects)
-        ratesOfObjectsUnlocked = random.randint(3, 9)
-        ratesOfObjectsToUnlock = random.randint(2, 8)
-        for i in range(0,len(researchableObjects)):
-            x = researchableObjects[i]
-            x = x.strip()
-            isUnlocked = False
-            toBeUnlocked = False
-            value = random.randint(0, len(researchableObjects))
-            if(value < len(researchableObjects)/ratesOfObjectsUnlocked):
-                isUnlocked = True
-            if(not isUnlocked):
-                value = random.randint(0, len(researchableObjects))
-                if(value > len(researchableObjects)/ratesOfObjectsToUnlock):
-                    toBeUnlocked = True
-            line = ''
-            if(i != 0):
-                line += ','
-            line += '{"@type":"ResearchRule","canUnlock":'
-            if(toBeUnlocked):
-                line += "true"
-            else:
-                line += "false"
-            line += ',"isUnlocked":'
-            if(isUnlocked):
-                line += "true"
-            else:
-                line += "false"
-            line += ',"name":"' + x + '"}'
-            result += line
-    return result
+	result = ""
+	with open("Data/researchableObjects.txt", 'r') as f_in:
+		researchableObjects = f_in.readlines()
+		length = len(researchableObjects)
+		ratesOfObjectsUnlocked = random.randint(3, 9)
+		ratesOfObjectsToUnlock = random.randint(2, 8)
+		for i in range(0,len(researchableObjects)):
+			x = researchableObjects[i]
+			x = x.strip()
+			isUnlocked = False
+			toBeUnlocked = False
+			value = random.randint(0, len(researchableObjects))
+			if(value < len(researchableObjects)/ratesOfObjectsUnlocked):
+				isUnlocked = True
+			if(not isUnlocked):
+				value = random.randint(0, len(researchableObjects))
+				if(value > len(researchableObjects)/ratesOfObjectsToUnlock):
+					toBeUnlocked = True
+			line = ''
+			if(i != 0):
+				line += ','
+			line += '{"@type":"ResearchRule","canUnlock":'
+			if(toBeUnlocked):
+				line += "true"
+			else:
+				line += "false"
+			line += ',"isUnlocked":'
+			if(isUnlocked):
+				line += "true"
+			else:
+				line += "false"
+			line += ',"name":"' + x + '"}'
+			result += line
+	return result
 
-'''
-LINE 1
+def replaceGoals(newData):
+	return replaceWithValue("goals", randomizeGoals(), newData, "],")
 
-file["scenario"]["goals"]["goals"]: list
+def randomizeGoals():
+	result = ""
+	nonOptionalGoals = random.randint(1, 4)
+	optionalGoals = random.randint(1, 4)
+	goals = generateGoals()
 
-{"@type":"ParkExperiencesGoal","value":0.6684032,"isOptional":false,"rewards":[]},
-{"@type":"ParkCleanlinessGoal","value":0.7517365,"isOptional":false,"rewards":[
-{"@type":"CoastersGoal","coasterCount":2,"minimumRatingValue":0.81,"isOptional":false,"rewards":[],"ratingType":"Intensity"},
-{"@type":"CoastersGoal","coasterCount":5,"minimumRatingValue":0.6,"isOptional":false,"rewards":[],"ratingType":"Excitement"},
-{"@type":"ParkDecorationGoal","value":0.7934032,"isOptional":false,"rewards":[]},
-{"@type":"GuestsInParkGoal","value":800,"isOptional":false,"rewards":[]},
+	value = randRangeStep(3300, 17700, 300)
+	line = ',{"@type":"TimeGoal","value":' + value + ',"isOptional":true,"rewards":[]}'
+	result += line
+	return result
+
+def generateGoals():
+	goals = [{"type": "ParkExperiencesGoal", "start":0.7,"stop":1},
+			{"type": "ParkCleanlinessGoal", "start":0.7,"stop":1},
+			{"type": "ParkDecorationGoal", "start":0.7,"stop":1},
+			{"type": "ParkHappinessGoal", "start":0.7,"stop":1},
+			{"type": "ParkPricesGoal", "start":0.7,"stop":1},
+			{"type": "ParkOverallRatingGoal", "start":0.7,"stop":1},
+			{"type": "CoastersGoal", "ratingType":"Excitement", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":1},
+			{"type": "CoastersGoal", "ratingType":"Intensity", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":1},
+			{"type": "GuestsInParkGoal", "start":200,"stop":2000,"step":50},
+			{"type": "ShopProfitGoal", "start":500,"stop":2000,"step":100},
+			{"type": "RideProfitGoal", "start":1000,"stop":5000,"step":250},
+			{"type": "OperatingProfitGoal", "start":2000,"stop":8000, "step":500},
+			{"type": "MoneyGoal", "start":50000,"stop":150000, "step": 10000},
+			{"type": "ParkTicketsGoal", "start":400,"stop":10000, "step":50}]
+	return goals
+
+
 {"@type":"NoLoanDebtsGoal","isOptional":false,"rewards":[]},
-{"@type":"ShopProfitGoal","value":500.,"isOptional":false,"rewards":[]},
-{"@type":"RideProfitGoal","value":1000.,"isOptional":false,"rewards":[]},
-{"@type":"OperatingProfitGoal","value":2000.,"isOptional":false,"rewards":[]},
-{"@type":"MoneyGoal","value":50000.,"isOptional":false,"rewards":[]},
-{"@type":"ParkOverallRatingGoal","value":0.5,"isOptional":false,"rewards":[]},
-{"@type":"ParkTicketsGoal","value":2000,"isOptional":false,"rewards":[]},
-{"@type":"ParkPricesGoal","value":0.5,"isOptional":false,"rewards":[]},
-{"@type":"ParkHappinessGoal","value":0.5,"isOptional":true,"rewards":[]},
+
 {"@type":"TimeGoal","value":3300,"isOptional":true,"rewards":[]}],"__timeRestraint":3600}
 
+def main():
+	baseDirName = os.path.dirname(os.path.abspath(__file__))
+	oldDirName = baseDirName + "\\Official Campaign\\Campaign"
+	newDirName = baseDirName + "\\Level Pool"
+	officialCampaign = getListOfFiles(oldDirName)
+	levelPool = getListOfFiles(newDirName)
+	usedLevels = {}
+			
+	for officialLevel in officialCampaign:
+		newLevel = getLevel(levelPool, usedLevels)
+		printLevel(officialLevel, newLevel)
+		usedLevels[newLevel["entry"]] = True
+		ungzip(officialLevel)
+		ungzip(newLevel)
+		newData = switchGuids(officialLevel, newLevel)
+		newData = replaceResearch(newData)
+		newData = replaceWithValue("isScenario", newData, "true")
+		newData = replaceSimpleRandom("maxGuestMultiplicator", newData, 1, 2)
+		newData = replaceSimpleRandom("moneyRangeMin", newData, 30, 50, 1)
+		newData = replaceSimpleRandom("moneyRangeMax", newData, 50, 70, 1)
+		newData = replaceSimpleRandom("intensityMean", newData, 3, 8)
+		newData = replaceSimpleRandom("happinessMultiplicator", newData, 1, 2)
+		newData = replaceSimpleRandom("hungerMultiplicator", newData, 1, 2)
+		newData = replaceSimpleRandom("thirstMultiplicator", newData, 1, 2)
+		newData = replaceSimpleRandom("tirednessMultiplicator", newData, 1, 2)
+		newData = replaceSimpleRandom("nauseaMultiplicator", newData, 1, 2)
+		newData = replaceSimpleRandom("globalHeightRestriction", newData, 10, 30, 1)
+		newData = replaceWithBoolean("disallowTerraforming", newData, percentageThreshold=75)
+		newData = replaceWithBoolean("freeShopProducts", newData, percentageThreshold=90)
+		newData = whatToCharge(newData, percentageThreshold=50)
+		newData = replaceSimpleRandom("money", newData, 10000, 30000, step=1000)
+		newData = replaceSimpleRandom("landTilePrice", newData, 15, 90, step=5)
+		newData = replaceSimpleRandom("__timeRestraint", newData, 300, 3600, step=300, separator="}")
+		
+		writeToFile(newLevel, newData)
 
+### REFACTOR ###
 
-
-file["isScenario"] -> true
-file["parkSettings"]["maxGuestMultiplicator"]
-file["parkSettings"]["moneyRangeMin"]
-file["parkSettings"]["moneyRangeMax"]
-file["parkSettings"]["intensityMean"]
-file["parkSettings"]["happinessMultiplicator"]
-file["parkSettings"]["hungerMultiplicator"]
-file["parkSettings"]["thirstMultiplicator"]
-file["parkSettings"]["tirednessMultiplicator"]
-file["parkSettings"]["nauseaMultiplicator"]
-file["parkSettings"]["disallowTerraforming"]
-file["parkSettings"]["cantChangeParkEntranceFee"]
-file["parkSettings"]["freeRideEntranceFees"]
-file["parkSettings"]["freeShopProducts"]
-file["parkSettings"]["globalHeightRestriction"]
-
-file["parkInfo"]["money"]
-file["parkInfo"]["parkEntranceFee"]
-file["parkInfo"]["landTilePrice"]
-file["parkInfo"]["loanController"]["loanPlans"]: list
-
-{"@type":"LoanPlan","bankIndex":7,"amount":4000.,"interest":0.008,"months":22,"isActive":false,"paidAmount":0.,"appearedTime":0}
-
+'''
+Guests in Park relate to guests already in park
+Rewards are related to research you can't unlock in the level normally
+NoLoanDebts creates a loan
+Time is related to current time
 '''
 
 if __name__ == '__main__':
-    main()
+	main()
