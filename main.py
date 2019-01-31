@@ -39,11 +39,7 @@ def switchGuids(oldLevel, newLevel):
 		guid = old_guid_forward[:end_guid_index]      
 		with open("Temp/"+newLevel["entry"]+".txt") as new_file:
 			newData = new_file.read()
-			guid_index = newData.find("guid")
-			new_guid_forward = newData[guid_index+7:len(newData)]
-			end_guid_index = new_guid_forward.find('",')
-			newData_modified = newData[:guid_index+7] + guid + newData[guid_index+7+end_guid_index:]
-			return newData_modified
+			return replaceWithValue('"guid"', newData, guid, ",")
 
 def writeToFile(newLevel, data):
 	f_out = gzip.open('New Campaign/Campaign/'+newLevel["entry"], 'wb')
@@ -67,12 +63,15 @@ def replaceSimpleRandom(field, newData, start, stop, step=0, separator=","):
 def getOffset(field):
 	return 2+len(field)
 
-def replaceWithValue(field, newData, newValue, separator=","):
-	offset = getOffset(field)
-	index = newData.find(field)
-	forward = newData[index+offset:len(newData)]
+def replaceWithValue(field, newData, newValue, separator=",", offset=0):
+	newData2 = newData[:]
+	if(offset == 0):
+		offset = getOffset(field)
+	index = newData2.find(field)
+	forward = newData2[index+offset:len(newData2)]
 	end_index = forward.find(separator)
-	newData_modified = newData[:index+offset] + str(newValue) + newData[index+offset+end_index:]
+	newData_modified = newData2[:index+offset] + str(newValue) + newData2[index+offset+end_index:]
+	#print(newData_modified[index-offset:index+offset+end_index+offset])
 	return newData_modified
 
 def replaceWithBoolean(field, newData, percentageThreshold=50, separator=","):
@@ -85,21 +84,21 @@ def replaceWithBoolean(field, newData, percentageThreshold=50, separator=","):
 def whatToCharge(newData, percentageThreshold=50, separator=","):
 	value = random.randint(1,100)
 	if(value > percentageThreshold):
-		newData = replaceWithValue("cantChargeParkEntranceFee", newData, "true", separator)
-		newData = replaceWithValue("freeRideEntranceFees", newData, "false", separator)
+		newData = replaceWithValue("cantChangeParkEntranceFee", newData[:], "true", separator)
+		newData = replaceWithValue("freeRideEntranceFees", newData[:], "false", separator)
 	elif(value <= 100 - percentageThreshold):
-		newData = replaceWithValue("cantChargeParkEntranceFee", newData, "false", separator)
-		newData = replaceWithValue("freeRideEntranceFees", newData, "true", separator)
+		newData = replaceWithValue("cantChangeParkEntranceFee", newData[:], "false", separator)
+		newData = replaceWithValue("freeRideEntranceFees", newData[:], "true", separator)
 	else:
-		newData = replaceWithValue("cantChargeParkEntranceFee", newData, "false", separator)
-		newData = replaceWithValue("freeRideEntranceFees", newData, "false", separator)
+		newData = replaceWithValue("cantChangeParkEntranceFee", newData[:], "false", separator)
+		newData = replaceWithValue("freeRideEntranceFees", newData[:], "false", separator)
 	return newData
 
 def replaceResearch(newData):
-	return replaceWithValue("rules", newData, randomizeResearch(), "],")
+	return replaceWithValue('rules', newData, randomizeResearch(), "],", offset=getOffset("rules"))
 
 def randomizeResearch():
-	result = ""
+	result = "["
 	with open("Data/researchableObjects.txt", 'r') as f_in:
 		researchableObjects = f_in.readlines()
 		length = len(researchableObjects)
@@ -135,10 +134,10 @@ def randomizeResearch():
 	return result
 
 def replaceGoals(newData):
-	return replaceWithValue('goals":[', newData, randomizeGoals(), "],")
+	return replaceWithValue('goals":[', newData, randomizeGoals(), "],", offset=getOffset("goals"))
 
 def randomizeGoals():
-	result = ""
+	result = "["
 	nonOptionalGoals = random.randint(1, 4)
 	optionalGoals = random.randint(1, 4)
 	baseGoals = generateGoals()
@@ -223,19 +222,18 @@ def main():
 		newData = switchGuids(officialLevel, newLevel)
 		newData = replaceResearch(newData)
 		newData = replaceWithValue("isScenario", newData, "true")
-		newData = replaceSimpleRandom("maxGuestMultiplicator", newData, 1, 2)
-		newData = replaceSimpleRandom("moneyRangeMin", newData, 30, 50, 1)
-		newData = replaceSimpleRandom("moneyRangeMax", newData, 50, 70, 1)
-		newData = replaceSimpleRandom("intensityMean", newData, 3, 8)
-		newData = replaceSimpleRandom("happinessMultiplicator", newData, 1, 2)
-		newData = replaceSimpleRandom("hungerMultiplicator", newData, 1, 2)
-		newData = replaceSimpleRandom("thirstMultiplicator", newData, 1, 2)
-		newData = replaceSimpleRandom("tirednessMultiplicator", newData, 1, 2)
-		newData = replaceSimpleRandom("nauseaMultiplicator", newData, 1, 2)
-		newData = replaceSimpleRandom("globalHeightRestriction", newData, 10, 30, 1)
+		newData = replaceSimpleRandom("maxGuestMultiplicator", newData, 0, 1)
+		newData = replaceSimpleRandom("moneyRangeMin", newData, 0, 0.5)
+		newData = replaceSimpleRandom("moneyRangeMax", newData, 0.5, 1)
+		newData = replaceSimpleRandom("intensityMean", newData, 0, 1)
+		newData = replaceSimpleRandom("happinessMultiplicator", newData, 0, 1)
+		newData = replaceSimpleRandom("hungerMultiplicator", newData, 0, 1)
+		newData = replaceSimpleRandom("thirstMultiplicator", newData, 0, 1)
+		newData = replaceSimpleRandom("tirednessMultiplicator", newData, 0, 1)
+		newData = replaceSimpleRandom("nauseaMultiplicator", newData, 0, 1)
 		newData = replaceWithBoolean("disallowTerraforming", newData, percentageThreshold=75)
 		newData = replaceWithBoolean("freeShopProducts", newData, percentageThreshold=90)
-		newData = whatToCharge(newData, percentageThreshold=50)
+		newData = whatToCharge(newData, percentageThreshold=75)
 		newData = replaceSimpleRandom("money", newData, 10000, 30000, step=1000)
 		newData = replaceSimpleRandom("landTilePrice", newData, 15, 90, step=5)
 		newData = replaceSimpleRandom("__timeRestraint", newData, 300, 3600, step=300, separator="}")
