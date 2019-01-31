@@ -54,7 +54,7 @@ def writeToFile(newLevel, data):
 def printLevel(officialLevel, newLevel):
 	print(officialLevel["entry"] + " -> " + newLevel["entry"])
 
-def randRangeStep(start, stop, step):
+def randRangeStep(start, stop, step=0):
 	if(step == 0):
 		return random.uniform(start, stop)
 	else:
@@ -146,7 +146,45 @@ def randomizeGoals():
 	result = ""
 	nonOptionalGoals = random.randint(1, 4)
 	optionalGoals = random.randint(1, 4)
-	goals = generateGoals()
+	baseGoals = generateGoals()
+	actualGoals = []
+	for i in range(0, nonOptionalGoals+optionalGoals):
+		goalType = baseGoals[random.randint(0,len(baseGoals)-1)]
+		if(goalType["type"] == "NoLoanDebtsGoal"):
+			actualGoals.append({"type": goalType["type"]})
+		elif(goalType["type"] == "CoastersGoal"):
+			coasterCount = random.randint(goalType["coasterCountStart"], goalType["coasterCountEnd"])
+			value = randRangeStep(goalType["start"],goalType["stop"])
+			actualGoals.append({"type": goalType["type"], "coasterCount": coasterCount, "value": value})
+		elif(not "step" in goalType):
+			value = randRangeStep(goalType["start"],goalType["stop"])
+			actualGoals.append({"type": goalType["type"], "value": value})
+		else:
+			value = randRangeStep(goalType["start"],goalType["stop"],goalType["step"])
+			actualGoals.append({"type": goalType["type"], "value": value})
+
+	#REWARDS FOR SOME GOALS
+	#REWARDS FOR GOALS THAT HAVE A HIGHER GOAL ELSEWHERE IN THE LIST
+	#ADD LOAN DEBT FOR NOLOANDEBTS
+	#CHECK CURRENT NUMBER OF GUESTS FOR GUESTGOAL
+	#CHECK CURRENT MONEY FOR MONEY
+	#CHECK CURRENT RATINGS FOR RATING GOALS
+
+	for i in range(0, nonOptionalGoals+optionalGoals):
+		line = ""
+		if(i != 0):
+			line += ","
+		line += '{"@type":"' + actualGoals[i]["type"] + '",'
+		if(actualGoals[i]["type"] == "CoastersGoal"):
+			line += '"coasterCount":' + actualGoals[i]["coasterCount"] + '",'
+		if(not actualGoals[i]["type"] == "NoLoanDebtsGoal"):
+			line += '"value":' + actualGoals[i]["value"] + ',"isOptional":'
+		if(i < nonOptionalGoals):
+			line += "false"
+		else:
+			line += "true"
+		line += ',"rewards":[]}'
+		result += "line"
 
 	value = randRangeStep(3300, 17700, 300)
 	line = ',{"@type":"TimeGoal","value":' + value + ',"isOptional":true,"rewards":[]}'
@@ -154,27 +192,25 @@ def randomizeGoals():
 	return result
 
 def generateGoals():
-	goals = [{"type": "ParkExperiencesGoal", "start":0.7,"stop":1},
-			{"type": "ParkCleanlinessGoal", "start":0.7,"stop":1},
-			{"type": "ParkDecorationGoal", "start":0.7,"stop":1},
-			{"type": "ParkHappinessGoal", "start":0.7,"stop":1},
-			{"type": "ParkPricesGoal", "start":0.7,"stop":1},
-			{"type": "ParkOverallRatingGoal", "start":0.7,"stop":1},
-			{"type": "CoastersGoal", "ratingType":"Excitement", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":1},
-			{"type": "CoastersGoal", "ratingType":"Intensity", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":1},
+	goals = [{"type": "ParkExperiencesGoal", "start":0.7,"stop":0.95,"step":0.05},
+			{"type": "ParkCleanlinessGoal", "start":0.7,"stop":0.95,"step":0.05},
+			{"type": "ParkDecorationGoal", "start":0.7,"stop":0.95,"step":0.05},
+			{"type": "ParkHappinessGoal", "start":0.7,"stop":0.95,"step":0.05},
+			{"type": "ParkPricesGoal", "start":0.7,"stop":0.95,"step":0.05},
+			{"type": "ParkOverallRatingGoal", "start":0.7,"stop":0.95,"step":0.05},
+			{"type": "CoastersGoal", "ratingType":"Excitement", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":0.8,"step":0.05},
+			{"type": "CoastersGoal", "ratingType":"Intensity", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":0.8,"step":0.05},
 			{"type": "GuestsInParkGoal", "start":200,"stop":2000,"step":50},
 			{"type": "ShopProfitGoal", "start":500,"stop":2000,"step":100},
 			{"type": "RideProfitGoal", "start":1000,"stop":5000,"step":250},
 			{"type": "OperatingProfitGoal", "start":2000,"stop":8000, "step":500},
 			{"type": "MoneyGoal", "start":50000,"stop":150000, "step": 10000},
-			{"type": "ParkTicketsGoal", "start":400,"stop":10000, "step":50}]
+			{"type": "ParkTicketsGoal", "start":400,"stop":10000, "step":50},
+			{"type": "NoLoanDebtsGoal"}]
 	return goals
 
 
 {"@type":"NoLoanDebtsGoal","isOptional":false,"rewards":[]},
-
-{"@type":"TimeGoal","value":3300,"isOptional":true,"rewards":[]}],"__timeRestraint":3600}
-
 def main():
 	baseDirName = os.path.dirname(os.path.abspath(__file__))
 	oldDirName = baseDirName + "\\Official Campaign\\Campaign"
@@ -208,17 +244,11 @@ def main():
 		newData = replaceSimpleRandom("money", newData, 10000, 30000, step=1000)
 		newData = replaceSimpleRandom("landTilePrice", newData, 15, 90, step=5)
 		newData = replaceSimpleRandom("__timeRestraint", newData, 300, 3600, step=300, separator="}")
-		
+		newData = replaceGoals(newData)
 		writeToFile(newLevel, newData)
 
 ### REFACTOR ###
-
-'''
-Guests in Park relate to guests already in park
-Rewards are related to research you can't unlock in the level normally
-NoLoanDebts creates a loan
-Time is related to current time
-'''
+### CHANGE MONEY SANDBOX POTENTIALLY TO UNLIMITED ###
 
 if __name__ == '__main__':
 	main()
