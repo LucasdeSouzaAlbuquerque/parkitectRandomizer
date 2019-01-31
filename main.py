@@ -61,23 +61,18 @@ def randRangeStep(start, stop, step=0):
 		return random.randint(0, int((stop-start)/step)) * step + start
 
 def replaceSimpleRandom(field, newData, start, stop, step=0, separator=","):
-	offset = getOffset(field)
 	newValue = randRangeStep(start, stop, step)
-	index = newData.find(field)
-	forward = newData[index+offset:len(newData)]
-	end_index = forward.find(separator)
-	newData_modified = newData[:index+offset] + newValue + newData[index+offset+end_index:]
-	return newData_modified
+	return replaceWithValue(field, newData, newValue, separator)
 
 def getOffset(field):
-	return 3+len(field)
+	return 2+len(field)
 
 def replaceWithValue(field, newData, newValue, separator=","):
 	offset = getOffset(field)
 	index = newData.find(field)
 	forward = newData[index+offset:len(newData)]
 	end_index = forward.find(separator)
-	newData_modified = newData[:index+offset] + newValue + newData[index+offset+end_index:]
+	newData_modified = newData[:index+offset] + str(newValue) + newData[index+offset+end_index:]
 	return newData_modified
 
 def replaceWithBoolean(field, newData, percentageThreshold=50, separator=","):
@@ -101,7 +96,7 @@ def whatToCharge(newData, percentageThreshold=50, separator=","):
 	return newData
 
 def replaceResearch(newData):
-	return replaceWithValue("rules", randomizeResearch(), newData, "],")
+	return replaceWithValue("rules", newData, randomizeResearch(), "],")
 
 def randomizeResearch():
 	result = ""
@@ -140,7 +135,7 @@ def randomizeResearch():
 	return result
 
 def replaceGoals(newData):
-	return replaceWithValue("goals", randomizeGoals(), newData, "],")
+	return replaceWithValue('goals":[', newData, randomizeGoals(), "],")
 
 def randomizeGoals():
 	result = ""
@@ -155,7 +150,7 @@ def randomizeGoals():
 		elif(goalType["type"] == "CoastersGoal"):
 			coasterCount = random.randint(goalType["coasterCountStart"], goalType["coasterCountEnd"])
 			value = randRangeStep(goalType["start"],goalType["stop"])
-			actualGoals.append({"type": goalType["type"], "coasterCount": coasterCount, "value": value})
+			actualGoals.append({"type": goalType["type"], "coasterCount": coasterCount, "value": value, "ratingType": goalType["ratingType"]})
 		elif(not "step" in goalType):
 			value = randRangeStep(goalType["start"],goalType["stop"])
 			actualGoals.append({"type": goalType["type"], "value": value})
@@ -169,6 +164,7 @@ def randomizeGoals():
 	#CHECK CURRENT NUMBER OF GUESTS FOR GUESTGOAL
 	#CHECK CURRENT MONEY FOR MONEY
 	#CHECK CURRENT RATINGS FOR RATING GOALS
+	#DIFFICULTY CURVE
 
 	for i in range(0, nonOptionalGoals+optionalGoals):
 		line = ""
@@ -176,18 +172,19 @@ def randomizeGoals():
 			line += ","
 		line += '{"@type":"' + actualGoals[i]["type"] + '",'
 		if(actualGoals[i]["type"] == "CoastersGoal"):
-			line += '"coasterCount":' + actualGoals[i]["coasterCount"] + '",'
+			line += '"coasterCount":' + str(actualGoals[i]["coasterCount"]) + ','
+			line += '"ratingType":"' + str(actualGoals[i]["ratingType"]) + '",'
 		if(not actualGoals[i]["type"] == "NoLoanDebtsGoal"):
-			line += '"value":' + actualGoals[i]["value"] + ',"isOptional":'
+			line += '"value":' + str(actualGoals[i]["value"]) + ',"isOptional":'
 		if(i < nonOptionalGoals):
 			line += "false"
 		else:
 			line += "true"
 		line += ',"rewards":[]}'
-		result += "line"
+		result += line
 
 	value = randRangeStep(3300, 17700, 300)
-	line = ',{"@type":"TimeGoal","value":' + value + ',"isOptional":true,"rewards":[]}'
+	line = ',{"@type":"TimeGoal","value":' + str(value) + ',"isOptional":true,"rewards":[]}'
 	result += line
 	return result
 
@@ -198,8 +195,8 @@ def generateGoals():
 			{"type": "ParkHappinessGoal", "start":0.7,"stop":0.95,"step":0.05},
 			{"type": "ParkPricesGoal", "start":0.7,"stop":0.95,"step":0.05},
 			{"type": "ParkOverallRatingGoal", "start":0.7,"stop":0.95,"step":0.05},
-			{"type": "CoastersGoal", "ratingType":"Excitement", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":0.8,"step":0.05},
-			{"type": "CoastersGoal", "ratingType":"Intensity", "coasterCountStart": 1, "coasterCountEnd": 10, "start":0.5,"stop":0.8,"step":0.05},
+			{"type": "CoastersGoal", "ratingType":"Excitement", "coasterCountStart": 3, "coasterCountEnd": 10, "start":0.5,"stop":0.8,"step":0.05},
+			{"type": "CoastersGoal", "ratingType":"Intensity", "coasterCountStart": 3, "coasterCountEnd": 10, "start":0.5,"stop":0.8,"step":0.05},
 			{"type": "GuestsInParkGoal", "start":200,"stop":2000,"step":50},
 			{"type": "ShopProfitGoal", "start":500,"stop":2000,"step":100},
 			{"type": "RideProfitGoal", "start":1000,"stop":5000,"step":250},
@@ -209,8 +206,6 @@ def generateGoals():
 			{"type": "NoLoanDebtsGoal"}]
 	return goals
 
-
-{"@type":"NoLoanDebtsGoal","isOptional":false,"rewards":[]},
 def main():
 	baseDirName = os.path.dirname(os.path.abspath(__file__))
 	oldDirName = baseDirName + "\\Official Campaign\\Campaign"
